@@ -16,6 +16,7 @@ export function generatePDFReceipt(customer, loan, paymentDetails) {
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.text(`Receipt Date: ${new Date().toLocaleDateString()}`, 150, 20);
+  doc.text(`Payment #${paymentDetails.paymentNumber || 1}`, 150, 26);
 
   // Customer & Pledge Details
   doc.setTextColor(51, 65, 85);
@@ -27,8 +28,9 @@ export function generatePDFReceipt(customer, loan, paymentDetails) {
   doc.setFontSize(9.5);
   doc.setFont('helvetica', 'normal');
   doc.text(`Name: ${customer.name}`, 14, 52);
-  doc.text(`Mobile: ${customer.mobile}`, 14, 58);
-  doc.text(`Address: ${customer.address || 'N/A'}`, 14, 64);
+  doc.text(`Customer ID: ${customer.id}`, 14, 58);
+  doc.text(`Mobile: ${customer.mobile}`, 14, 64);
+  doc.text(`Address: ${customer.address || 'N/A'}`, 14, 70);
 
   doc.text(`Item: ${loan.collateral_type} (${loan.collateral_details})`, 110, 52);
   doc.text(`Gold Weight: ${loan.gold_weight_grams}g`, 110, 58);
@@ -36,7 +38,7 @@ export function generatePDFReceipt(customer, loan, paymentDetails) {
 
   // Table
   doc.autoTable({
-    startY: 75,
+    startY: 82,
     head: [['Transaction Breakdown', 'Amount (INR)']],
     body: [
       ['Total Paid Amount Received', `INR ${paymentDetails.amountPaid.toFixed(2)}`],
@@ -60,5 +62,9 @@ export function generatePDFReceipt(customer, loan, paymentDetails) {
     doc.text('* Note: Interest calculated daily on pro-rata basis.', 14, finalY);
   }
 
-  doc.save(`Receipt_${customer.name}_${Date.now()}.pdf`);
+  const safeName = customer.name.trim().replace(/[^a-z0-9]+/gi, '_');
+  const paymentNumber = paymentDetails.paymentNumber || 1;
+  const paymentLabel = paymentNumber === 1 ? '1st' : paymentNumber === 2 ? '2nd' : paymentNumber === 3 ? '3rd' : `${paymentNumber}th`;
+  const statusLabel = paymentDetails.remainingPrincipal === 0 ? '_loan_closed' : '';
+  doc.save(`${safeName}_${paymentLabel}_payment${statusLabel}.pdf`);
 }

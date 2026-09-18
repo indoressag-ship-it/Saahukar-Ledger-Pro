@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, Home } from 'lucide-react';
+import { AlertCircle, Home, LockKeyhole } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { calculateLiveInterest, processPartPayment } from './utils/interestEngine';
 import { generatePDFReceipt } from './utils/pdfGenerator';
 import CustomerDirectory from './components/CustomerDirectory';
+import AuthPinModal from './components/AuthPinModal';
+import CustomerProfile from './components/CustomerProfile';
+import PrivateLedger from './components/PrivateLedger';
+import Reports from './components/Reports';
 
 function SuccessVisual({ message }) {
   return (
@@ -27,7 +31,11 @@ function CreatorCredit() {
 
 function getStoredData(userId) {
   try {
-    return JSON.parse(localStorage.getItem(`sahukar-data-${userId}`) || '{"customers":[],"payments":[]}');
+    const parsed = JSON.parse(localStorage.getItem(`sahukar-data-${userId}`) || '{"customers":[],"payments":[]}');
+    return {
+      customers: Array.isArray(parsed?.customers) ? parsed.customers : [],
+      payments: Array.isArray(parsed?.payments) ? parsed.payments : []
+    };
   } catch {
     return { customers: [], payments: [] };
   }
@@ -39,11 +47,12 @@ export default function App() {
   const [authMode, setAuthMode] = useState('LOGIN'); // 'LOGIN' or 'SIGNUP'
   const [loading, setLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
-  const [dataError, setDataError] = useState('');
+  const [dataError] = useState('');
   const [actionMessage, setActionMessage] = useState({ type: '', text: '' });
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
+  const [pinLocked, setPinLocked] = useState(false);
 
   // Sign In / Sign Up Form States
   const [email, setEmail] = useState('');
@@ -54,7 +63,7 @@ export default function App() {
   const [businessName, setBusinessName] = useState('');
 
   // UI Tabs & Language State
-  const [activeTab, setActiveTab] = useState('dash'); // 'dash', 'add', 'dir', 'pay', 'tools'
+  const [activeTab, setActiveTab] = useState('dash'); // 'dash', 'add', 'dir', 'pay', 'ledger', 'reports', 'tools'
   const [lang, setLang] = useState(() => localStorage.getItem('sahukar-language') || 'HINGLISH');
 
   // Application Data States
@@ -72,13 +81,14 @@ export default function App() {
   const [payCustId, setPayCustId] = useState('');
   const [selectedCust, setSelectedCust] = useState(null);
   const [payAmount, setPayAmount] = useState('');
+  const [profileCustomer, setProfileCustomer] = useState(null);
+  const [pinValue, setPinValue] = useState(() => localStorage.getItem('sahukar-pin') || '1234');
 
   const loadData = async (userId) => {
     setDataLoading(true);
-    setDataError('');
     const storedData = getStoredData(userId);
-    setCustomers(storedData.customers || []);
-    setPayments(storedData.payments || []);
+    setCustomers(storedData.customers);
+    setPayments(storedData.payments);
     setDataLoading(false);
   };
 
@@ -97,13 +107,16 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session: nextSession } }) => {
       if (!mounted) return;
       setSession(nextSession);
-      if (nextSession?.user?.id) loadData(nextSession.user.id);
+      if (nextSession?.user?.id) { loadData(nextSession.user.id); setPinLocked(true); }
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
-      if (nextSession?.user?.id) loadData(nextSession.user.id);
+      if (nextSession?.user?.id) { loadData(nextSession.user.id); setPinLocked(true); }
+      if (_event === 'SIGNED_IN' && nextSession?.user?.email_confirmed_at) {
+        setActionMessage({ type: 'success', text: 'Email confirmed. Sahukar Ledger Pro mein aapka account ready hai.' });
+      }
       setLoading(false);
     });
 
@@ -146,6 +159,7 @@ export default function App() {
       } else {
         setSession(data.session);
         await loadData(data.session.user.id);
+        setPinLocked(true);
       }
     }
     setAuthBusy(false);
@@ -232,10 +246,11 @@ export default function App() {
     const paid = parseFloat(payAmount);
     const payment = processPartPayment(selectedCust.principal, selectedCust.interest, paid);
     const { interestPaid: intPaid, principalDeducted: princPaid, remainingPrincipal: newPrinc } = payment;
+    const paymentNumber = payments.filter(paymentItem => paymentItem.customer_id === selectedCust.id).length + 1;
 
     const nextCustomers = customers.map(customer => customer.id === selectedCust.id ? { ...customer, principal: newPrinc } : customer);
     const nextPayment = {
-      id: Date.now(),
+      id: `${selectedCust.id}-${paymentNumber}`,
       customer_id: selectedCust.id,
       payment_date: new Date().toISOString().split('T')[0],
       total_paid: paid,
@@ -248,13 +263,37 @@ export default function App() {
     generatePDFReceipt(
       selectedCust,
       { collateral_type: selectedCust.collateral || 'Not recorded', collateral_details: selectedCust.notes || 'N/A', gold_weight_grams: selectedCust.gold_weight || 0, monthly_rate: selectedCust.interest_rate },
-      { amountPaid: paid, interestPaid: intPaid, principalDeducted: princPaid, remainingPrincipal: newPrinc }
+      { amountPaid: paid, interestPaid: intPaid, principalDeducted: princPaid, remainingPrincipal: newPrinc, paymentNumber }
     );
+    openWhatsApp(selectedCust, { totalPayableNow: paid });
 
     setActionMessage({ type: 'success', text: 'Bhugtan safaltapoorvak darj kiya gaya!' });
     setPayAmount('');
     setSelectedCust(null);
     setPayCustId('');
+  };
+
+  const openWhatsApp = (customer, calc) => {
+    const message = `Namaste ${customer.name}, Customer ID ${customer.id}. Aapka current payable amount ₹${Number(calc.totalPayableNow).toFixed(2)} hai. Kripya payment ke liye sampark karein. - Sahukar Ledger Pro`;
+    window.open(`https://wa.me/${String(customer.mobile).replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const deleteCustomer = (customer) => {
+    if (!window.confirm(`${customer.name} ka customer record delete karna hai? Payment history bhi delete hogi.`)) return;
+    const nextCustomers = customers.filter(item => item.id !== customer.id);
+    const nextPayments = payments.filter(item => item.customer_id !== customer.id);
+    saveData(session.user.id, nextCustomers, nextPayments);
+    setProfileCustomer(null);
+    setActionMessage({ type: 'success', text: 'Customer record delete ho gaya.' });
+  };
+
+  const savePin = () => {
+    if (!/^\d{4}$/.test(pinValue)) {
+      setActionMessage({ type: 'error', text: 'PIN exactly 4 digits ka hona chahiye.' });
+      return;
+    }
+    localStorage.setItem('sahukar-pin', pinValue);
+    setActionMessage({ type: 'success', text: 'Security PIN update ho gaya.' });
   };
 
   const exportBackup = () => {
@@ -362,6 +401,10 @@ export default function App() {
     );
   }
 
+  if (pinLocked) {
+    return <AuthPinModal savedPin={pinValue} onSuccess={() => setPinLocked(false)} />;
+  }
+
   // Dashboard Aggregates
   const totalActiveCust = customers.length;
   const totalPrincipal = customers.reduce((acc, c) => acc + c.principal, 0);
@@ -415,6 +458,12 @@ export default function App() {
         </button>
         <button onClick={() => setActiveTab('pay')} className={`whitespace-nowrap px-4 sm:px-6 py-3 font-bold text-sm rounded-t-lg transition ${activeTab === 'pay' ? 'bg-slate-50 text-cyan-700 border-b-4 border-cyan-600' : 'text-slate-600 hover:bg-slate-50'}`}>
           {lang === 'EN' ? 'Part Payment' : 'Payment Jama'}
+        </button>
+        <button onClick={() => { setProfileCustomer(null); setActiveTab('ledger'); }} className={`whitespace-nowrap px-4 sm:px-6 py-3 font-bold text-sm rounded-t-lg transition ${activeTab === 'ledger' ? 'bg-slate-50 text-cyan-700 border-b-4 border-cyan-600' : 'text-slate-600 hover:bg-slate-50'}`}>
+          Private Ledger
+        </button>
+        <button onClick={() => setActiveTab('reports')} className={`whitespace-nowrap px-4 sm:px-6 py-3 font-bold text-sm rounded-t-lg transition ${activeTab === 'reports' ? 'bg-slate-50 text-cyan-700 border-b-4 border-cyan-600' : 'text-slate-600 hover:bg-slate-50'}`}>
+          Reports
         </button>
         <button onClick={() => setActiveTab('tools')} className={`whitespace-nowrap px-4 sm:px-6 py-3 font-bold text-sm rounded-t-lg transition ${activeTab === 'tools' ? 'bg-slate-50 text-cyan-700 border-b-4 border-cyan-600' : 'text-slate-600 hover:bg-slate-50'}`}>
           {lang === 'EN' ? 'Backup & Tools' : 'Tools'}
@@ -519,8 +568,12 @@ export default function App() {
         )}
 
         {/* 3. CUSTOMER DIRECTORY TAB */}
-        {activeTab === 'dir' && (
-          <CustomerDirectory customers={customers} onSelectPayment={(customer) => { setPayCustId(String(customer.id)); setActiveTab('pay'); }} />
+        {activeTab === 'dir' && !profileCustomer && (
+          <CustomerDirectory customers={customers} onOpenProfile={setProfileCustomer} onDeleteCustomer={deleteCustomer} onWhatsApp={openWhatsApp} onSelectPayment={(customer) => { setPayCustId(String(customer.id)); setActiveTab('pay'); }} />
+        )}
+
+        {activeTab === 'dir' && profileCustomer && (
+          <CustomerProfile customer={profileCustomer} payments={payments} onBack={() => setProfileCustomer(null)} onPay={() => { setPayCustId(String(profileCustomer.id)); setActiveTab('pay'); setProfileCustomer(null); }} onWhatsApp={() => openWhatsApp(profileCustomer, calculateInterest(profileCustomer.principal, profileCustomer.interest_rate, profileCustomer.loan_date))} />
         )}
 
         {/* 4. PART PAYMENT TAB */}
@@ -555,6 +608,10 @@ export default function App() {
           </div>
         )}
 
+        {activeTab === 'ledger' && <PrivateLedger customers={customers} payments={payments} onOpenCustomer={(customer) => { setProfileCustomer(customer); setActiveTab('dir'); }} />}
+
+        {activeTab === 'reports' && <Reports customers={customers} payments={payments} />}
+
         {/* 5. BACKUP & TOOLS TAB */}
         {activeTab === 'tools' && (
           <div className="bg-white p-8 rounded-lg shadow-md border max-w-2xl space-y-4">
@@ -567,6 +624,11 @@ export default function App() {
               <button onClick={exportBackup} className="rounded-lg border border-slate-300 px-4 py-2.5 font-bold text-slate-700 transition hover:border-cyan-600 hover:text-cyan-700">
                 Download Backup
               </button>
+              <button onClick={() => setPinLocked(true)} className="action-button action-button--dark"><LockKeyhole size={16} /> Lock now</button>
+            </div>
+            <div className="settings-block">
+              <h3 className="font-bold text-slate-800">Change security PIN</h3>
+              <div className="mt-3 flex flex-wrap gap-3"><input type="password" inputMode="numeric" maxLength="4" value={pinValue} onChange={event => setPinValue(event.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="4 digit PIN" className="p-3 border-2 rounded-lg font-bold" /><button onClick={savePin} className="action-button action-button--primary">Save PIN</button></div>
             </div>
           </div>
         )}

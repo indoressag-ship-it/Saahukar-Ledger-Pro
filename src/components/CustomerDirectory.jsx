@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { calculateLiveInterest } from '../utils/interestEngine';
 
-export default function CustomerDirectory({ customers, onSelectPayment }) {
+export default function CustomerDirectory({ customers, onSelectPayment, onOpenProfile, onDeleteCustomer, onWhatsApp }) {
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredCustomers = customers.filter(customer =>
@@ -34,7 +34,7 @@ export default function CustomerDirectory({ customers, onSelectPayment }) {
               <th className="p-3">Days</th>
               <th className="p-3">Live Accrued Interest</th>
               <th className="p-3">Total Payable</th>
-              <th className="p-3">Action</th>
+              <th className="p-3">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -70,12 +70,12 @@ export default function CustomerDirectory({ customers, onSelectPayment }) {
                   <td className="p-3 text-amber-600 font-semibold">₹{calc.livePendingInterest.toFixed(2)}</td>
                   <td className="p-3 font-bold text-emerald-700">₹{calc.totalPayableNow.toFixed(2)}</td>
                   <td className="p-3">
-                    <button
-                      onClick={() => onSelectPayment?.(customer, calc)}
-                      className="bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded text-xs font-medium"
-                    >
-                      Pay & Receipt
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      <button onClick={() => onOpenProfile?.(customer)} className="table-action table-action--view">Profile</button>
+                      <button onClick={() => onSelectPayment?.(customer, calc)} className="table-action table-action--pay">Pay</button>
+                      <button onClick={() => onWhatsApp?.(customer, calc)} className="table-action table-action--whatsapp">WhatsApp</button>
+                      <button onClick={() => onDeleteCustomer?.(customer)} className="table-action table-action--delete">Delete</button>
+                    </div>
                   </td>
                 </tr>
               );
