@@ -27,6 +27,7 @@ export default function CustomerDirectory({ customers, onSelectPayment }) {
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-800 text-white">
             <tr>
+              <th className="p-3">Customer ID</th>
               <th className="p-3">Customer</th>
               <th className="p-3">Collateral</th>
               <th className="p-3">Principal</th>
@@ -53,6 +54,7 @@ export default function CustomerDirectory({ customers, onSelectPayment }) {
                       : 'hover:bg-slate-50 text-slate-700'
                   }`}
                 >
+                  <td className="p-3 font-bold text-slate-900">{customer.id}</td>
                   <td className="p-3">
                     <div className="font-bold">{customer.name}</div>
                     <div className="text-xs text-slate-500">{customer.mobile}</div>
