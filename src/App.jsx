@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, Home, LockKeyhole } from 'lucide-react';
-import { supabase } from './supabaseClient';
+import { supabase, supabaseReady } from './supabaseClient';
 import { calculateLiveInterest, processPartPayment } from './utils/interestEngine';
 import { generatePDFReceipt } from './utils/pdfGenerator';
 import CustomerDirectory from './components/CustomerDirectory';
@@ -199,6 +199,11 @@ export default function App() {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
+
+    if (!supabaseReady) {
+      setErrorMsg('Cloud sync is disabled because Supabase credentials are missing. Create a .env file with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to enable the same account across devices.');
+      return;
+    }
 
     if (authBusy) return;
     setAuthBusy(true);
