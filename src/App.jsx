@@ -41,6 +41,35 @@ function getStoredData(userId) {
   }
 }
 
+async function fetchUserDataFromSupabase(userId) {
+  const { data: customerRows, error: customerError } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (customerError) throw customerError;
+
+  const customerIds = (customerRows || []).map(customer => customer.id);
+  let paymentRows = [];
+
+  if (customerIds.length > 0) {
+    const { data: fetchedPayments, error: paymentError } = await supabase
+      .from('payments')
+      .select('*')
+      .in('customer_id', customerIds)
+      .order('created_at', { ascending: false });
+
+    if (paymentError) throw paymentError;
+    paymentRows = fetchedPayments || [];
+  }
+
+  return {
+    customers: customerRows || [],
+    payments: paymentRows || []
+  };
+}
+
 export default function App() {
   // Auth & Session States
   const [session, setSession] = useState(null);
@@ -86,16 +115,55 @@ export default function App() {
 
   const loadData = async (userId) => {
     setDataLoading(true);
-    const storedData = getStoredData(userId);
-    setCustomers(storedData.customers);
-    setPayments(storedData.payments);
-    setDataLoading(false);
+
+    try {
+      const syncedData = await fetchUserDataFromSupabase(userId);
+      setCustomers(syncedData.customers);
+      setPayments(syncedData.payments);
+      localStorage.setItem(`sahukar-data-${userId}`, JSON.stringify({ customers: syncedData.customers, payments: syncedData.payments }));
+    } catch (error) {
+      console.error('Failed to load remote ledger data, falling back to local cache:', error);
+      const storedData = getStoredData(userId);
+      setCustomers(storedData.customers);
+      setPayments(storedData.payments);
+    } finally {
+      setDataLoading(false);
+    }
   };
 
-  const saveData = (userId, nextCustomers, nextPayments) => {
-    localStorage.setItem(`sahukar-data-${userId}`, JSON.stringify({ customers: nextCustomers, payments: nextPayments }));
-    setCustomers(nextCustomers);
-    setPayments(nextPayments);
+  const saveData = async (userId, nextCustomers, nextPayments) => {
+    const normalizedCustomers = nextCustomers.map(customer => ({
+      ...customer,
+      user_id: userId
+    }));
+
+    const normalizedPayments = nextPayments.map(payment => ({
+      ...payment,
+      customer_id: Number(payment.customer_id)
+    }));
+
+    try {
+      const { error: customerError } = await supabase
+        .from('customers')
+        .upsert(normalizedCustomers, { onConflict: 'id' });
+
+      if (customerError) throw customerError;
+
+      const { error: paymentError } = await supabase
+        .from('payments')
+        .upsert(normalizedPayments, { onConflict: 'id' });
+
+      if (paymentError) throw paymentError;
+
+      localStorage.setItem(`sahukar-data-${userId}`, JSON.stringify({ customers: nextCustomers, payments: nextPayments }));
+      setCustomers(nextCustomers);
+      setPayments(nextPayments);
+    } catch (error) {
+      console.error('Failed to sync ledger data to Supabase, saving locally instead:', error);
+      localStorage.setItem(`sahukar-data-${userId}`, JSON.stringify({ customers: nextCustomers, payments: nextPayments }));
+      setCustomers(nextCustomers);
+      setPayments(nextPayments);
+    }
   };
 
   useEffect(() => {
@@ -214,7 +282,7 @@ export default function App() {
       notes: custForm.notes
     };
     const nextCustomers = [...customers, nextCustomer];
-    saveData(session.user.id, nextCustomers, payments);
+    await saveData(session.user.id, nextCustomers, payments);
     {
       setActionMessage({ type: 'success', text: 'Naya grahak record safaltapoorvak saheja gaya!' });
       setCustForm({
@@ -232,6 +300,7 @@ export default function App() {
     if (found) {
       const calc = calculateInterest(found.principal, found.interest_rate, found.loan_date);
       setSelectedCust({ ...found, ...calc });
+      setActionMessage({ type: 'success', text: 'Confirmed — customer details loaded successfully.' });
     } else {
       setActionMessage({ type: 'error', text: 'Grahak nahi mila! Sahi Customer ID dalein.' });
       setSelectedCust(null);
@@ -250,15 +319,15 @@ export default function App() {
 
     const nextCustomers = customers.map(customer => customer.id === selectedCust.id ? { ...customer, principal: newPrinc } : customer);
     const nextPayment = {
-      id: `${selectedCust.id}-${paymentNumber}`,
-      customer_id: selectedCust.id,
+      id: Date.now() + Math.floor(Math.random() * 1000),
+      customer_id: Number(selectedCust.id),
       payment_date: new Date().toISOString().split('T')[0],
       total_paid: paid,
       interest_paid: intPaid,
       principal_paid: princPaid,
       remaining_principal: newPrinc
     };
-    saveData(session.user.id, nextCustomers, [nextPayment, ...payments]);
+    await saveData(session.user.id, nextCustomers, [nextPayment, ...payments]);
 
     generatePDFReceipt(
       selectedCust,
@@ -267,7 +336,7 @@ export default function App() {
     );
     openWhatsApp(selectedCust, { totalPayableNow: paid });
 
-    setActionMessage({ type: 'success', text: 'Bhugtan safaltapoorvak darj kiya gaya!' });
+    setActionMessage({ type: 'success', text: 'Confirmed — payment processed successfully.' });
     setPayAmount('');
     setSelectedCust(null);
     setPayCustId('');
@@ -278,11 +347,11 @@ export default function App() {
     window.open(`https://wa.me/${String(customer.mobile).replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
   };
 
-  const deleteCustomer = (customer) => {
+  const deleteCustomer = async (customer) => {
     if (!window.confirm(`${customer.name} ka customer record delete karna hai? Payment history bhi delete hogi.`)) return;
     const nextCustomers = customers.filter(item => item.id !== customer.id);
     const nextPayments = payments.filter(item => item.customer_id !== customer.id);
-    saveData(session.user.id, nextCustomers, nextPayments);
+    await saveData(session.user.id, nextCustomers, nextPayments);
     setProfileCustomer(null);
     setActionMessage({ type: 'success', text: 'Customer record delete ho gaya.' });
   };
