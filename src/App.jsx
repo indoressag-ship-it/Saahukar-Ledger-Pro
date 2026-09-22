@@ -70,6 +70,34 @@ async function fetchUserDataFromSupabase(userId) {
   };
 }
 
+async function migrateLocalDataToSupabase(userId, localData) {
+  if (localData.customers.length === 0) return false;
+
+  const customers = localData.customers.map(customer => ({
+    ...customer,
+    user_id: userId
+  }));
+  const payments = localData.payments.map(payment => ({
+    ...payment,
+    id: Number(payment.id) || Date.now(),
+    customer_id: Number(payment.customer_id)
+  }));
+
+  const { error: customerError } = await supabase
+    .from('customers')
+    .upsert(customers, { onConflict: 'id' });
+  if (customerError) throw customerError;
+
+  if (payments.length > 0) {
+    const { error: paymentError } = await supabase
+      .from('payments')
+      .upsert(payments, { onConflict: 'id' });
+    if (paymentError) throw paymentError;
+  }
+
+  return true;
+}
+
 export default function App() {
   // Auth & Session States
   const [session, setSession] = useState(null);
@@ -118,6 +146,15 @@ export default function App() {
 
     try {
       const syncedData = await fetchUserDataFromSupabase(userId);
+      const localData = getStoredData(userId);
+      if (syncedData.customers.length === 0 && localData.customers.length > 0) {
+        await migrateLocalDataToSupabase(userId, localData);
+        const migratedData = await fetchUserDataFromSupabase(userId);
+        setCustomers(migratedData.customers);
+        setPayments(migratedData.payments);
+        localStorage.setItem(`sahukar-data-${userId}`, JSON.stringify(migratedData));
+        return;
+      }
       setCustomers(syncedData.customers);
       setPayments(syncedData.payments);
       localStorage.setItem(`sahukar-data-${userId}`, JSON.stringify({ customers: syncedData.customers, payments: syncedData.payments }));
