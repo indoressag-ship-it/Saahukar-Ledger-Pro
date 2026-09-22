@@ -69,3 +69,26 @@ create policy "Users can insert their payments"
     where customers.id = payments.customer_id
       and customers.user_id = auth.uid()
   ));
+
+drop policy if exists "Users can update their payments" on public.payments;
+create policy "Users can update their payments"
+  on public.payments for update
+  using (exists (
+    select 1 from public.customers
+    where customers.id = payments.customer_id
+      and customers.user_id = auth.uid()
+  ))
+  with check (exists (
+    select 1 from public.customers
+    where customers.id = payments.customer_id
+      and customers.user_id = auth.uid()
+  ));
+
+drop policy if exists "Users can delete their payments" on public.payments;
+create policy "Users can delete their payments"
+  on public.payments for delete
+  using (exists (
+    select 1 from public.customers
+    where customers.id = payments.customer_id
+      and customers.user_id = auth.uid()
+  ));

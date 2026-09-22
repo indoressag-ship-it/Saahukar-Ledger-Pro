@@ -77,9 +77,9 @@ async function migrateLocalDataToSupabase(userId, localData) {
     ...customer,
     user_id: userId
   }));
-  const payments = localData.payments.map(payment => ({
+  const payments = localData.payments.map((payment, index) => ({
     ...payment,
-    id: Number(payment.id) || Date.now(),
+    id: Number(payment.id) || Date.now() + index,
     customer_id: Number(payment.customer_id)
   }));
 
