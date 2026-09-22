@@ -415,9 +415,21 @@ export default function App() {
       setActionMessage({ type: 'error', text: 'PIN exactly 4 digits ka hona chahiye.' });
       return;
     }
+
+    let { data: { session: currentSession } } = await supabase.auth.getSession();
+    if (!currentSession || (currentSession.expires_at && currentSession.expires_at * 1000 <= Date.now() + 30000)) {
+      const { data, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !data.session) {
+        setActionMessage({ type: 'error', text: 'Login session expire ho gaya hai. Please logout karke dobara login karein, phir PIN save karein.' });
+        return;
+      }
+      currentSession = data.session;
+      setSession(currentSession);
+    }
+
     const { error } = await supabase.auth.updateUser({ data: { ledger_pin: pinValue } });
     if (error) {
-      setActionMessage({ type: 'error', text: `PIN save nahi hua: ${error.message}` });
+      setActionMessage({ type: 'error', text: 'PIN save nahi hua. Session refresh nahi ho paaya; please dobara login karke try karein.' });
       return;
     }
     setActionMessage({ type: 'success', text: 'Confirmed — security PIN account mein save ho gaya.' });
