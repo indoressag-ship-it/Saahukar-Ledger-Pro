@@ -9,6 +9,9 @@ import CustomerProfile from './components/CustomerProfile';
 import PrivateLedger from './components/PrivateLedger';
 import Reports from './components/Reports';
 
+const WINDOWS_DOWNLOAD_URL = 'https://github.com/indoressag-ship-it/Saahukar-Ledger-Pro/releases/download/latest/Sahukar-Ledger-Pro-Setup-0.0.0.exe';
+const ANDROID_DOWNLOAD_URL = 'https://github.com/indoressag-ship-it/Saahukar-Ledger-Pro/releases/download/latest/Sahukar-Ledger-Pro-Android.apk';
+
 function SuccessVisual({ message }) {
   return (
     <div className="success-visual" role="status">
@@ -745,6 +748,12 @@ export default function App() {
               <button onClick={handleRefreshData} className="rounded-lg bg-slate-900 px-4 py-2.5 font-bold text-white transition hover:bg-slate-700 disabled:opacity-50" disabled={dataLoading}>
                 {dataLoading ? 'Syncing...' : 'Refresh Data'}
               </button>
+              <a href={WINDOWS_DOWNLOAD_URL} className="rounded-lg bg-blue-600 px-4 py-2.5 font-bold text-white transition hover:bg-blue-700" download>
+                Download for Windows / PC
+              </a>
+              <a href={ANDROID_DOWNLOAD_URL} className="rounded-lg bg-emerald-600 px-4 py-2.5 font-bold text-white transition hover:bg-emerald-700" download>
+                Download for Android
+              </a>
               <button onClick={exportBackup} className="rounded-lg border border-slate-300 px-4 py-2.5 font-bold text-slate-700 transition hover:border-cyan-600 hover:text-cyan-700">
                 Download Backup
               </button>
