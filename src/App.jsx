@@ -531,6 +531,14 @@ export default function App() {
           </form>
 
           <div className="mt-6 text-center border-t pt-4">
+            <div className="mb-4 flex flex-wrap justify-center gap-2">
+              <a href={WINDOWS_DOWNLOAD_URL} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-700" download>
+                Download for Windows / PC
+              </a>
+              <a href={ANDROID_DOWNLOAD_URL} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700" download>
+                Download for Android
+              </a>
+            </div>
             <button className="text-sm font-bold text-blue-600 hover:underline" onClick={() => { setAuthMode(authMode === 'LOGIN' ? 'SIGNUP' : 'LOGIN'); setErrorMsg(''); }}>
               {authMode === 'LOGIN' ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
             </button>
@@ -572,6 +580,12 @@ export default function App() {
             className="border border-slate-600 hover:border-cyan-400 hover:text-cyan-300 font-bold px-4 py-2 rounded-lg text-sm transition">
             {lang === 'EN' ? 'Hinglish' : 'English'}
           </button>
+          <a href={WINDOWS_DOWNLOAD_URL} className="border border-blue-400 text-blue-200 hover:bg-blue-600 font-bold px-3 py-2 rounded-lg text-sm transition" download>
+            Windows Download
+          </a>
+          <a href={ANDROID_DOWNLOAD_URL} className="border border-emerald-400 text-emerald-200 hover:bg-emerald-600 font-bold px-3 py-2 rounded-lg text-sm transition" download>
+            Android Download
+          </a>
           <button 
             onClick={() => supabase.auth.signOut()}
             className="bg-red-600 hover:bg-red-700 font-bold px-4 py-2 rounded text-sm text-white transition">
@@ -606,6 +620,9 @@ export default function App() {
         </button>
         <button onClick={() => setActiveTab('tools')} className={`whitespace-nowrap px-4 sm:px-6 py-3 font-bold text-sm rounded-t-lg transition ${activeTab === 'tools' ? 'bg-slate-50 text-cyan-700 border-b-4 border-cyan-600' : 'text-slate-600 hover:bg-slate-50'}`}>
           {lang === 'EN' ? 'Backup & Tools' : 'Tools'}
+        </button>
+        <button onClick={() => setActiveTab('downloads')} className={`whitespace-nowrap px-4 sm:px-6 py-3 font-bold text-sm rounded-t-lg transition ${activeTab === 'downloads' ? 'bg-slate-50 text-cyan-700 border-b-4 border-cyan-600' : 'text-slate-600 hover:bg-slate-50'}`}>
+          Downloads
         </button>
       </nav>
 
@@ -750,6 +767,26 @@ export default function App() {
         {activeTab === 'ledger' && <PrivateLedger customers={customers} payments={payments} onOpenCustomer={(customer) => { setProfileCustomer(customer); setActiveTab('dir'); }} />}
 
         {activeTab === 'reports' && <Reports customers={customers} payments={payments} />}
+
+        {activeTab === 'downloads' && (
+          <div className="bg-white p-8 rounded-lg shadow-md border max-w-3xl space-y-6">
+            <div>
+              <p className="eyebrow">Sahukar Ledger Pro</p>
+              <h2 className="text-2xl font-bold text-slate-800">Download Apps</h2>
+              <p className="mt-2 text-slate-600">Apne computer ya Android device ke liye app download karein.</p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <a href={WINDOWS_DOWNLOAD_URL} className="rounded-lg bg-blue-600 p-5 font-bold text-white transition hover:bg-blue-700" download>
+                <span className="block text-lg">Download for Windows / PC</span>
+                <span className="mt-1 block text-sm font-medium text-blue-100">EXE installer for PC and laptop</span>
+              </a>
+              <a href={ANDROID_DOWNLOAD_URL} className="rounded-lg bg-emerald-600 p-5 font-bold text-white transition hover:bg-emerald-700" download>
+                <span className="block text-lg">Download for Android</span>
+                <span className="mt-1 block text-sm font-medium text-emerald-100">APK installer for mobile</span>
+              </a>
+            </div>
+          </div>
+        )}
 
         {/* 5. BACKUP & TOOLS TAB */}
         {activeTab === 'tools' && (
