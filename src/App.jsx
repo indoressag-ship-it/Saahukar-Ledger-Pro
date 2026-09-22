@@ -139,7 +139,7 @@ export default function App() {
   const [selectedCust, setSelectedCust] = useState(null);
   const [payAmount, setPayAmount] = useState('');
   const [profileCustomer, setProfileCustomer] = useState(null);
-  const [pinValue, setPinValue] = useState(() => localStorage.getItem('sahukar-pin') || '1234');
+  const [pinValue, setPinValue] = useState('1234');
 
   const loadData = async (userId) => {
     setDataLoading(true);
@@ -212,13 +212,21 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session: nextSession } }) => {
       if (!mounted) return;
       setSession(nextSession);
-      if (nextSession?.user?.id) { loadData(nextSession.user.id); setPinLocked(true); }
+      if (nextSession?.user?.id) {
+        setPinValue(nextSession.user.user_metadata?.ledger_pin || '1234');
+        loadData(nextSession.user.id);
+        setPinLocked(true);
+      }
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
-      if (nextSession?.user?.id) { loadData(nextSession.user.id); setPinLocked(true); }
+      if (nextSession?.user?.id) {
+        setPinValue(nextSession.user.user_metadata?.ledger_pin || '1234');
+        loadData(nextSession.user.id);
+        setPinLocked(true);
+      }
       if (_event === 'SIGNED_IN' && nextSession?.user?.email_confirmed_at) {
         setActionMessage({ type: 'success', text: 'Email confirmed. Sahukar Ledger Pro mein aapka account ready hai.' });
       }
@@ -268,6 +276,7 @@ export default function App() {
         setErrorMsg(error.message);
       } else {
         setSession(data.session);
+        setPinValue(data.user.user_metadata?.ledger_pin || '1234');
         await loadData(data.session.user.id);
         setPinLocked(true);
       }
@@ -398,13 +407,17 @@ export default function App() {
     setActionMessage({ type: 'success', text: 'Customer record delete ho gaya.' });
   };
 
-  const savePin = () => {
+  const savePin = async () => {
     if (!/^\d{4}$/.test(pinValue)) {
       setActionMessage({ type: 'error', text: 'PIN exactly 4 digits ka hona chahiye.' });
       return;
     }
-    localStorage.setItem('sahukar-pin', pinValue);
-    setActionMessage({ type: 'success', text: 'Security PIN update ho gaya.' });
+    const { error } = await supabase.auth.updateUser({ data: { ledger_pin: pinValue } });
+    if (error) {
+      setActionMessage({ type: 'error', text: `PIN save nahi hua: ${error.message}` });
+      return;
+    }
+    setActionMessage({ type: 'success', text: 'Confirmed — security PIN account mein save ho gaya.' });
   };
 
   const exportBackup = () => {
