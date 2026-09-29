@@ -9,3 +9,7 @@ exe. app/
 *.asar
 *.blockmap
 *.iss
+
+.env
+.env.local
+.env.*
