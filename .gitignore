@@ -1,0 +1,11 @@
+node_modules/
+dist/
+release/
+Saahukar Ledger Pro-win32-x64/
+exe. app/
+*.exe
+*.apk
+*.zip
+*.asar
+*.blockmap
+*.iss

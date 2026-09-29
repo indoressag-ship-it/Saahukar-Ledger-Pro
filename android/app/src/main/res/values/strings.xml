@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Sahukar Ledger Pro</string>
+    <string name="title_activity_main">Sahukar Ledger Pro</string>
+    <string name="package_name">com.sahukar.ledgerpro</string>
+    <string name="custom_url_scheme">com.sahukar.ledgerpro</string>
+</resources>

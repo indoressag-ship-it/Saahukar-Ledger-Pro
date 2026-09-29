@@ -1,0 +1,8 @@
+{
+  "appId": "com.sahukar.ledgerpro",
+  "appName": "Sahukar Ledger Pro",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
